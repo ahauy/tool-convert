@@ -9,7 +9,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ToolsService } from './tools.service';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('tools')
