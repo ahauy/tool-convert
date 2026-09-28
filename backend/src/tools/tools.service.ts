@@ -10,7 +10,7 @@ export class ToolsService {
       mimeType: file.mimetype,
       size: file.size,
       base64,
-      dataUrl: `data:${file.mimetype};base64,${base64}`,
+      // dataUrl: `data:${file.mimetype};base64,${base64}`,
     };
   }
 }

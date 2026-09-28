@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   FileTypeValidator,
   MaxFileSizeValidator,
@@ -17,7 +18,14 @@ export class ToolsController {
   constructor(private toolsServices: ToolsService) {}
 
   @Post('image-to-base64')
-  @UseInterceptors(FileInterceptor('file'))
+  // @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
   @UseGuards(JwtAuthGuard)
   imageToBase64(
     @UploadedFile(
