@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
-import { PassportStrategy } from "@nestjs/passport";
-import { ExtractJwt, Strategy } from "passport-jwt";
-import { UsersService } from "src/users/users.service";
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -13,10 +13,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate( id: string ): Promise<any> {
-    const user = await this.usersService.findByUsername(id)
-    if(!user) {
-      throw new UnauthorizedException('Người dùng không tồn tại')
+  async validate(payload: { id: string }): Promise<any> {
+    const user = await this.usersService.findById(payload.id);
+    if (!user) {
+      throw new UnauthorizedException('Người dùng không tồn tại');
     }
     const { password, ...result } = user;
     return result;
