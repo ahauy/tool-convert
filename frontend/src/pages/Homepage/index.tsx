@@ -1,5 +1,5 @@
-import ExampleComponents from "@/components/Examples/ExampleComponents";
 import PageWrapper from "@/components/PageWrapper";
+import FileToBase64 from "./components/FileToBase64";
 
 const Homepage = () => {
   //! State
@@ -11,7 +11,7 @@ const Homepage = () => {
   return (
     <PageWrapper>
       <div className="component:Homepage">
-        <ExampleComponents />
+        <FileToBase64 />
       </div>
     </PageWrapper>
   );

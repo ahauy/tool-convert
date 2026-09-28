@@ -1,20 +1,10 @@
 const BaseUrl = {
   // ImportBaseURL
   Homepage: "/",
-  Todos: "/todos",
   Login: "/login",
-  Callbacks: "/login/callback",
   Logout: "/logout",
-  AppManagement: "/apps",
-
-  CreateApp: "/create-app",
-
-  Users: "/users",
-  Settings: "/settings",
-  AppConnect: "/app-connect",
-
-  ChangePassword: "/change-password",
-  ForgotPassword: "/forgot-password",
+  ImageToBase64: "/image-to-base64",
+  VideoToBase64: "/video-to-base64"
 };
 
 export default BaseUrl;

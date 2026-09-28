@@ -21,6 +21,16 @@ class Services {
       }
     );
 
+    this.axios.interceptors.request.use((config) => {
+      const token = this.getTokenStorage();
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      return config;
+    });
+
     //! Interceptor response
     this.axios.interceptors.response.use(
       function (config) {

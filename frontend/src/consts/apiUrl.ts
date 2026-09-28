@@ -1,6 +1,11 @@
-const ROOT_URL = `/api`;
+const ROOT_URL = `${import.meta.env.VITE_URL_BACKEND}/api`;
 
-// Dont remove this command
-// ImportAPIURL
-export const USER_URL = `${ROOT_URL}/user`;
-export const TODO_URL = `https://jsonplaceholder.typicode.com/photos`;
+export const ApiUrl = {
+  // auth 
+  REGISTER: `${ROOT_URL}/auth/register`,
+  LOGIN: `${ROOT_URL}/auth/login`,
+
+  // tools
+  IMAGE_TO_BASE64: `${ROOT_URL}/tools/image-to-base64`,
+  VIDEO_TO_BASE64: `${ROOT_URL}/tools/video-to-base64`,
+}

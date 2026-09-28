@@ -24,12 +24,9 @@ import Loading from "./components/ui/loading";
 import SidebarProvider from "./providers/SidebarProvider";
 import { showError } from "./helpers/toast";
 import BaseUrl from "./consts/baseUrl";
-import Login from "./pages/Login";
-import ForgotPassword from "./pages/ForgotPassword";
+import Login from "./pages/AuthPage/Login";
 import DefaultLayout from "./layouts/DefaultLayout";
 import Homepage from "./pages/Homepage";
-import ChangePassword from "./pages/ChangePassword";
-import Todos from "./pages/Todos";
 
 const ErrorFallback = ({ error, resetErrorBoundary }: any) => {
   return (
@@ -68,7 +65,6 @@ const App = () => {
       <Router>
         <Routes>
           <Route path={BaseUrl.Login} element={<Login />} />
-          <Route path={BaseUrl.ForgotPassword} element={<ForgotPassword />} />
           <Route
             path={BaseUrl.Homepage}
             element={
@@ -90,8 +86,6 @@ const App = () => {
             }
           >
             <Route index element={<Homepage />} />
-            <Route path={BaseUrl.Todos} element={<Todos />} />
-            <Route path={BaseUrl.ChangePassword} element={<ChangePassword />} />
           </Route>
 
           <Route path="*" element={<Page404 />} />

@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   FileTypeValidator,
   MaxFileSizeValidator,
@@ -20,9 +19,9 @@ export class ToolsController {
   @Post('image-to-base64')
   // @UseInterceptors(FileInterceptor('file'))
   @UseInterceptors(
-    FileInterceptor('file', {
+    FileInterceptor('image', {
       limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
+        fileSize: 10 * 1024 * 1024,
       },
     }),
   )
@@ -32,7 +31,7 @@ export class ToolsController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({
-            maxSize: 10 * 1024 * 1024, // 10MB
+            maxSize: 10 * 1024 * 1024,
           }),
 
           new FileTypeValidator({
@@ -48,7 +47,26 @@ export class ToolsController {
 
   @Post('video-to-base64')
   @UseGuards(JwtAuthGuard)
-  convertVideo() {
-    return 'hello';
+  @UseInterceptors(
+    FileInterceptor('video', {
+      limits: {
+        fileSize: 50 * 1024 * 1024,
+      },
+    }),
+  )
+  videoToBase64(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 50 * 1024 * 1024 }),
+          new FileTypeValidator({
+            fileType: /^video\/(mp4|webm|ogg|quicktime|x-msvideo|x-matroska)$/,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.toolsServices.videoToBase64(file);
   }
 }

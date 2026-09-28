@@ -17,7 +17,7 @@ import Loading from "../ui/loading";
 import AsyncSelectField from "../customFieldsFormik/AsyncSelectField";
 import * as Yup from "yup";
 import DialogForm from "../dialogs/DialogForm";
-import { useGetTodos } from "@/pages/Todos/hooks/useTodos";
+
 
 const ExampleComponents = () => {
   const [openConfirm, toggleConfirm, shouldRenderConfirm] = useToggleDialog();
@@ -32,29 +32,29 @@ const ExampleComponents = () => {
     page: 1,
     rowsPerPage: 15,
   });
-  const { data, isPending } = useGetTodos({ filters });
+  // const { data, isPending } = useGetTodos({ filters });
 
-  const renderExampleTodos = () => {
-    if (isPending) {
-      return (
-        <div>
-          <Loading />
-        </div>
-      );
-    }
+  // const renderExampleTodos = () => {
+  //   if (isPending) {
+  //     return (
+  //       <div>
+  //         <Loading />
+  //       </div>
+  //     );
+  //   }
 
-    return (
-      <div>
-        {(data || []).map((el) => {
-          return (
-            <div key={el.id}>
-              {el.id} - {el.title}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  //   return (
+  //     <div>
+  //       {(data || []).map((el) => {
+  //         return (
+  //           <div key={el.id}>
+  //             {el.id} - {el.title}
+  //           </div>
+  //         );
+  //       })}
+  //     </div>
+  //   );
+  // };
 
   return (
     <Formik
@@ -259,7 +259,7 @@ const ExampleComponents = () => {
             </div>
 
             <div>
-              {renderExampleTodos()}
+              {/* {renderExampleTodos()} */}
 
               <div className="mt-2 flex gap-3">
                 <Button
