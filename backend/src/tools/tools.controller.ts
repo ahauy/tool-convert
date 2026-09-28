@@ -13,19 +13,15 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('tools')
+@UseGuards(JwtAuthGuard)
 export class ToolsController {
-  constructor(private toolsServices: ToolsService) {}
+  constructor(private toolsServices: ToolsService) { }
 
   @Post('image-to-base64')
   // @UseInterceptors(FileInterceptor('file'))
   @UseInterceptors(
-    FileInterceptor('image', {
-      limits: {
-        fileSize: 10 * 1024 * 1024,
-      },
-    }),
+    FileInterceptor('image'),
   )
-  @UseGuards(JwtAuthGuard)
   imageToBase64(
     @UploadedFile(
       new ParseFilePipe({
@@ -46,13 +42,8 @@ export class ToolsController {
   }
 
   @Post('video-to-base64')
-  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
-    FileInterceptor('video', {
-      limits: {
-        fileSize: 50 * 1024 * 1024,
-      },
-    }),
+    FileInterceptor('video'),
   )
   videoToBase64(
     @UploadedFile(

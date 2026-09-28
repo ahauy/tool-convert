@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ToolsService {
-  imageToBase64(file: Express.Multer.File) {
+
+  private fileToBase64(file: Express.Multer.File) {
     const base64: string = file.buffer.toString('base64');
 
     return {
@@ -14,15 +15,11 @@ export class ToolsService {
     };
   }
 
-  videoToBase64(file: Express.Multer.File) {
-    const base64: string = file.buffer.toString('base64');
+  imageToBase64(file: Express.Multer.File) {
+    return this.fileToBase64(file)
+  }
 
-    return {
-      fileName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      base64,
-      // dataUrl: `data:${file.mimetype};base64,${base64}`,
-    };
+  videoToBase64(file: Express.Multer.File) {
+    return this.fileToBase64(file)
   }
 }
