@@ -1,7 +1,7 @@
 const ROOT_URL = `${import.meta.env.VITE_URL_BACKEND}/api`;
 
 export const ApiUrl = {
-  // auth 
+  // auth
   REGISTER: `${ROOT_URL}/auth/register`,
   LOGIN: `${ROOT_URL}/auth/login`,
   REFRESH_TOKEN: `${ROOT_URL}/auth/refresh-token`,
@@ -10,4 +10,6 @@ export const ApiUrl = {
   // tools
   IMAGE_TO_BASE64: `${ROOT_URL}/tools/image-to-base64`,
   VIDEO_TO_BASE64: `${ROOT_URL}/tools/video-to-base64`,
-}
+  BASE64_TO_IMAGE: `${ROOT_URL}/tools/base64-to-image`,
+  BASE64_TO_VIDEO: `${ROOT_URL}/tools/base64-to-video`,
+};

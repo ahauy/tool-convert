@@ -1,68 +1,137 @@
-import { useState } from "react";
-import axios from "axios";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import httpService from "@/services/httpService";
 import { ApiUrl } from "@/consts/apiUrl";
+import { base64Store } from "@/helpers/base64Store";
+import { showError, showSuccess } from "@/helpers/toast";
+import {
+  ACCEPT_FILES,
+  PREVIEW_LENGTH,
+  downloadTextParts,
+  formatBytes,
+  getErrorMessage,
+  getMediaKind,
+  makePreview,
+  normalizeFile,
+  validateFile,
+} from "@/helpers/file";
 
-const FileToBase64 = () => {
+interface ConvertResponse {
+  fileName: string;
+  mimeType: string;
+  size: number;
+  base64: string; // Base64 "trần", không có tiền tố data:
+}
+
+// Chỉ giữ thông tin nhỏ trong state. Chuỗi Base64 đầy đủ nằm trong ref.
+interface ResultMeta {
+  fileName: string;
+  mimeType: string;
+  base64Length: number;
+}
+
+interface Props {
+  onSendToDecoder?: () => void;
+}
+
+const FileToBase64 = ({ onSendToDecoder }: Props) => {
   const [file, setFile] = useState<File | null>(null);
-  const [base64, setBase64] = useState("");
+  const [meta, setMeta] = useState<ResultMeta | null>(null);
+  const [head, setHead] = useState(""); // chỉ PREVIEW_LENGTH ký tự đầu để hiển thị
+  const [withPrefix, setWithPrefix] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+  // Chuỗi đầy đủ: giữ ngoài state để React không phải theo dõi / render lại
+  const base64Ref = useRef("");
 
-    if (!selectedFile) return;
+  const prefix = meta ? `data:${meta.mimeType};base64,` : "";
+  const activePrefix = withPrefix ? prefix : "";
+  const totalLength = meta ? meta.base64Length + activePrefix.length : 0;
+  const previewText = meta
+    ? makePreview(activePrefix + head, totalLength)
+    : "";
 
-    setFile(selectedFile);
-    setBase64("");
+  const resetResult = () => {
+    base64Ref.current = "";
+    setMeta(null);
+    setHead("");
   };
 
-  // xem la video hay image -> tu do goi url
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    const normalized = normalizeFile(selected);
+    const error = validateFile(normalized);
+
+    resetResult();
+
+    if (error) {
+      showError(error);
+      e.target.value = "";
+      setFile(null);
+      return;
+    }
+
+    setFile(normalized);
+  };
+
   const handleConvert = async () => {
     if (!file) return;
+
+    const kind = getMediaKind(file.type);
+    if (!kind) return;
 
     try {
       setIsLoading(true);
 
-      const isImage = file.type.startsWith("image/");
-      const isVideo = file.type.startsWith("video/");
-
-      if (!isImage && !isVideo) {
-        alert("Chỉ được upload image hoặc video");
-        return;
-      }
-
+      // Tên field phải khớp FileInterceptor('image' | 'video') ở backend
       const formData = new FormData();
+      formData.append(kind, file);
 
-      let url = "";
+      const url =
+        kind === "image" ? ApiUrl.IMAGE_TO_BASE64 : ApiUrl.VIDEO_TO_BASE64;
 
-      if (isImage) {
-        formData.append("image", file);
+      const { data } = await httpService.axios.post<ConvertResponse>(
+        url,
+        formData
+      );
 
-        url = ApiUrl.IMAGE_TO_BASE64;
-        console.log(url)
-      } else {
-        formData.append("video", file);
-
-        url = ApiUrl.VIDEO_TO_BASE64;
-      }
-
-      const response = await httpService.axios.post(url, formData)
-
-      setBase64(response.data.base64);
+      base64Ref.current = data.base64;
+      setHead(data.base64.slice(0, PREVIEW_LENGTH));
+      setMeta({
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        base64Length: data.base64.length,
+      });
     } catch (error) {
-      console.error(error);
-
-      if (axios.isAxiosError(error)) {
-        alert(error.response?.data?.message || "Convert thất bại");
-      } else {
-        alert("Convert thất bại");
-      }
+      showError(await getErrorMessage(error, "Convert thất bại"));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(activePrefix + base64Ref.current);
+      showSuccess("Đã copy vào clipboard");
+    } catch {
+      showError("Không thể copy, hãy dùng nút Tải .txt");
+    }
+  };
+
+  const handleDownloadTxt = () => {
+    if (!meta) return;
+    const baseName = meta.fileName.replace(/\.[^.]+$/, "");
+    // Blob nhận mảng các đoạn -> không phải nối thành 1 chuỗi khổng lồ
+    downloadTextParts([activePrefix, base64Ref.current], `${baseName}.base64.txt`);
+  };
+
+  const handleSendToDecoder = () => {
+    // Luôn kèm tiền tố vì backend base64-to-* yêu cầu data URL
+    base64Store.set(prefix + base64Ref.current);
+    onSendToDecoder?.();
   };
 
   return (
@@ -73,7 +142,7 @@ const FileToBase64 = () => {
 
         <input
           type="file"
-          accept="image/*,video/*"
+          accept={ACCEPT_FILES}
           onChange={handleFileChange}
           className="rounded-md border p-2"
         />
@@ -83,18 +152,15 @@ const FileToBase64 = () => {
             <p>
               <strong>File:</strong> {file.name}
             </p>
-
             <p>
               <strong>Type:</strong> {file.type}
             </p>
-
             <p>
-              <strong>Size:</strong> {(file.size / 1024 / 1024).toFixed(2)} MB
+              <strong>Size:</strong> {formatBytes(file.size)}
             </p>
-
             <p>
               <strong>Loại:</strong>{" "}
-              {file.type.startsWith("image/") ? "Image" : "Video"}
+              {getMediaKind(file.type) === "image" ? "Image" : "Video"}
             </p>
           </div>
         )}
@@ -111,14 +177,52 @@ const FileToBase64 = () => {
 
       {/* Base64 */}
       <div className="flex flex-1 flex-col gap-3">
-        <label className="font-medium">Base64</label>
+        <div className="flex items-center justify-between">
+          <label className="font-medium">Base64</label>
 
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={withPrefix}
+              onChange={(e) => setWithPrefix(e.target.checked)}
+            />
+            Kèm tiền tố data URL
+          </label>
+        </div>
+
+        {/* Chỉ hiển thị phần đầu; chuỗi đầy đủ không đưa vào DOM */}
         <textarea
-          value={base64}
-          onChange={(e) => setBase64(e.target.value)}
+          value={previewText}
+          readOnly
           placeholder="Base64 sẽ xuất hiện ở đây..."
-          className="min-h-[250px] w-full rounded-md border p-3"
+          className="min-h-[250px] w-full break-all rounded-md border p-3 text-xs"
         />
+
+        {meta && (
+          <>
+            <p className="text-sm text-gray-500">
+              {meta.mimeType} · {totalLength.toLocaleString()} ký tự
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={handleCopy}>
+                Copy
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDownloadTxt}
+              >
+                Tải .txt
+              </Button>
+              {onSendToDecoder && (
+                <Button type="button" onClick={handleSendToDecoder}>
+                  Chuyển sang Base64 → File
+                </Button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

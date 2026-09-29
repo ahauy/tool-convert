@@ -11,8 +11,12 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.use(helmet());
   app.use(cookieParser());
-  app.enableCors({ origin: true, credentials: true });
-  app.useBodyParser('json', { limit: '15mb' });
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    exposedHeaders: ['Content-Disposition'], // để frontend đọc được tên file
+  });
+  app.useBodyParser('json', { limit: '70mb' });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

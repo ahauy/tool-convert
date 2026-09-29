@@ -1,158 +1,74 @@
-// import { UserInfo } from "@/interfaces/user";
-// import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
-
 import { ApiUrl } from "@/consts/apiUrl";
-import axios, { Axios, AxiosError, AxiosInstance, AxiosRequestConfig } from "axios"
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosRequestConfig,
+  InternalAxiosRequestConfig,
+} from "axios";
 
-// export const TOKEN_KEY = "token";
-// export const USER_KEY = "user";
+export const TOKEN_KEY = "token";
 
-// class Services {
-//   axios: AxiosInstance;
+type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
-//   constructor() {
-//     this.axios = axios;
-//     this.axios.defaults.withCredentials = true;
-
-//     //! Interceptor request
-//     this.axios.interceptors.request.use(
-//       function (config) {
-//         return config;
-//       },
-//       function (error) {
-//         return Promise.reject(error);
-//       }
-//     );
-
-//     this.axios.interceptors.request.use((config) => {
-//       const token = this.getTokenStorage();
-
-//       if (token) {
-//         config.headers.Authorization = `Bearer ${token}`;
-//       }
-
-//       return config;
-//     });
-
-//     //! Interceptor response
-//     this.axios.interceptors.response.use(
-//       function (config) {
-//         return config;
-//       },
-//       function (error) {
-//         return Promise.reject(error);
-//       }
-//     );
-//   }
-
-//   attachTokenToHeader(token: string) {
-//     this.axios.interceptors.request.use(
-//       function (config) {
-//         if (config.headers) {
-//           // Do something before request is sent
-//           config.headers.Authorization = `Bearer ${token}`;
-//         }
-//         return config;
-//       },
-//       function (error) {
-//         return Promise.reject(error);
-//       }
-//     );
-//   }
-
-//   setupInterceptors() {
-//     this.axios.interceptors.response.use(
-//       (response) => {
-//         return response;
-//       },
-//       (error) => {
-//         const { status } = error?.response || {};
-//         if (status === 401) {
-//           window.localStorage.clear();
-//           window.location.reload();
-//         }
-
-//         return Promise.reject(error);
-//       }
-//     );
-//   }
-
-//   get(url: string, config?: AxiosRequestConfig) {
-//     return this.axios.get(url, config);
-//   }
-
-//   post(url: string, data: any, config?: AxiosRequestConfig) {
-//     return this.axios.post(url, data, config);
-//   }
-
-//   delete(url: string, config?: AxiosRequestConfig) {
-//     return this.axios.delete(url, config);
-//   }
-
-//   put(url: string, data: any, config?: AxiosRequestConfig) {
-//     return this.axios.put(url, data, config);
-//   }
-
-//   saveTokenStorage(token: string) {
-//     localStorage.setItem(TOKEN_KEY, token);
-//   }
-
-//   getTokenStorage() {
-//     const token = localStorage.getItem(TOKEN_KEY);
-//     return token || "";
-//   }
-
-//   clearStorage() {
-//     localStorage.removeItem(TOKEN_KEY);
-//     localStorage.removeItem(USER_KEY);
-//   }
-
-//   saveUserStorage(user: UserInfo) {
-//     localStorage.setItem(USER_KEY, JSON.stringify(user));
-//   }
-
-//   getUserStorage() {
-//     if (localStorage.getItem(USER_KEY)) {
-//       return JSON.parse(localStorage?.getItem(USER_KEY) || "") as UserInfo;
-//     }
-
-//     return null;
-//   }
-// }
-
-// export default new Services();
-
-
-export const TOKEN_KEY = "token"
 class Services {
   axios: AxiosInstance;
 
-  private isRefreshing = false;
+  // Dùng chung 1 lần refresh cho nhiều request cùng bị 401
+  private refreshPromise: Promise<string> | null = null;
 
   constructor() {
     this.axios = axios.create({
       baseURL: import.meta.env.VITE_API_URL,
       withCredentials: true,
-    })
+    });
 
-    this.setupRequestInterceptor()
-    this.setupResponseInterceptor()
-
+    this.setupRequestInterceptor();
+    this.setupResponseInterceptor();
   }
 
   private setupRequestInterceptor() {
     this.axios.interceptors.request.use(
       (config) => {
-        const token = this.getTokenStorage()
+        const token = this.getTokenStorage();
 
         if (token) {
-          config.headers.Authorization = `Bearer ${token}`
+          config.headers.Authorization = `Bearer ${token}`;
         }
 
         return config;
       },
       (error) => Promise.reject(error)
-    )
+    );
+  }
+
+  /**
+   * Gọi refresh bằng axios "trần" (KHÔNG dùng this.axios) để request này
+   * không đi qua interceptor. Nếu đi qua, khi refresh trả 401 thì interceptor
+   * lại gọi refresh tiếp -> lặp vô hạn (chính là lỗi bạn gặp).
+   */
+  private refreshAccessToken(): Promise<string> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = axios
+        .post(ApiUrl.REFRESH_TOKEN, null, { withCredentials: true })
+        .then((res) => {
+          const newAccessToken: string = res.data.accessToken;
+          this.saveTokenStorage(newAccessToken);
+          return newAccessToken;
+        })
+        .finally(() => {
+          this.refreshPromise = null;
+        });
+    }
+    return this.refreshPromise;
+  }
+
+  private isAuthUrl(url?: string) {
+    return (
+      !!url &&
+      [ApiUrl.LOGIN, ApiUrl.REGISTER, ApiUrl.REFRESH_TOKEN].some((u) =>
+        url.includes(u)
+      )
+    );
   }
 
   private setupResponseInterceptor() {
@@ -160,60 +76,61 @@ class Services {
       (response) => response,
 
       async (error: AxiosError) => {
-        const originalRequest = error.config;
+        const originalRequest = error.config as RetryableConfig | undefined;
 
-        if (
+        const shouldRefresh =
           error.response?.status === 401 &&
-          originalRequest
-        ) {
-          try {
-            const res = await this.axios.post(`${ApiUrl.REFRESH_TOKEN}`)
-            const newAccessToken = res.data.accessToken;
+          !!originalRequest &&
+          !originalRequest._retry && // mỗi request chỉ được thử lại 1 lần
+          !this.isAuthUrl(originalRequest.url); // login / refresh không refresh
 
-            this.saveTokenStorage(newAccessToken);
-
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-
-            return this.axios(originalRequest)
-          } catch (error) {
-            this.clearStorage();
-            window.location.reload();
-            return Promise.reject(error);
-          }
+        if (!shouldRefresh) {
+          return Promise.reject(error);
         }
-        return Promise.reject(error)
-      }
-    )
 
+        originalRequest._retry = true;
+
+        try {
+          const newAccessToken = await this.refreshAccessToken();
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          return this.axios(originalRequest);
+        } catch (refreshError) {
+          // Refresh thất bại (hết hạn / bị thu hồi / thiếu cookie) -> đăng xuất
+          this.clearStorage();
+          window.location.href = "/login";
+          return Promise.reject(refreshError);
+        }
+      }
+    );
   }
 
   get(url: string, config?: AxiosRequestConfig) {
-    return this.axios.get(url, config)
+    return this.axios.get(url, config);
   }
 
   post(url: string, data?: any, config?: AxiosRequestConfig) {
-    return this.axios.post(url, data, config)
+    return this.axios.post(url, data, config);
   }
 
   delete(url: string, config?: AxiosRequestConfig) {
-    return this.axios.delete(url, config)
+    return this.axios.delete(url, config);
   }
 
   put(url: string, data?: any, config?: AxiosRequestConfig) {
-    return this.axios.put(url, data, config)
+    return this.axios.put(url, data, config);
   }
 
   saveTokenStorage(token: string) {
-    localStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(TOKEN_KEY, token);
   }
 
   getTokenStorage() {
-    return localStorage.getItem(TOKEN_KEY)
+    return localStorage.getItem(TOKEN_KEY);
   }
 
   clearStorage() {
-    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(TOKEN_KEY);
   }
 }
 
-export default new Services()
+export default new Services();

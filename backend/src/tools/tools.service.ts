@@ -17,6 +17,7 @@ const MIME_TO_EXT: Record<string, string> = {
   'image/bmp': 'bmp',
   'image/tiff': 'tiff',
   'image/x-icon': 'ico',
+  'image/heic': 'heic',
   // Videos
   'video/mp4': 'mp4',
   'video/webm': 'webm',
@@ -24,6 +25,7 @@ const MIME_TO_EXT: Record<string, string> = {
   'video/x-msvideo': 'avi',
   'video/x-matroska': 'mkv',
   'video/mpeg': 'mpeg',
+  'video/ogg': 'ogv',
 };
 
 @Injectable()
