@@ -60,11 +60,18 @@ const AuthenticationProvider = ({ children }: { children: any }) => {
     []
   );
 
-  const logout = useCallback(() => {
-    httpService.clearStorage();
-    window.sessionStorage.clear();
-    window.location.reload();
-  }, []);
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      httpService.clearStorage();
+      window.sessionStorage.clear();
+      setToken(null);
+      window.location.reload();
+    }
+  }, [setToken]);
 
   //! Return
   const value = useMemo(() => {

@@ -71,7 +71,7 @@ export class AuthController {
     };
   }
 
-  @Post('logout')
+  @Post('log-out')
   async logout(
     @Req() req: express.Request,
     @Res({ passthrough: true }) res: express.Response,

@@ -19,4 +19,8 @@ export const authService = {
 
     return accessToken
   },
+
+  logout: async () => {
+    await httpService.axios.post(ApiUrl.LOG_OUT)
+  }
 };
