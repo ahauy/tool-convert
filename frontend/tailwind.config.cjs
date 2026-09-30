@@ -13,21 +13,6 @@ module.exports = {
       padding: "2rem",
       screens: {
         "2xl": "1400px",
-
-        // 'sm': '640px',
-        // => @media (min-width: 640px) { ... }
-
-        // 'md': '768px',
-        // => @media (min-width: 768px) { ... }
-
-        // 'lg': '1024px',
-        // => @media (min-width: 1024px) { ... }
-
-        // 'xl': '1280px',
-        // => @media (min-width: 1280px) { ... }
-
-        // '2xl': '1536px',
-        // => @media (min-width: 1536px) { ... }
       },
     },
     extend: {
@@ -80,10 +65,28 @@ module.exports = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: 0 },
         },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "slide-up": {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
+        "slide-up": "slide-up 0.3s ease-out",
+      },
+      screens: {
+        xs: "480px",
+        sm: "640px",
+        md: "768px",
+        lg: "1024px",
+        xl: "1280px",
+        "2xl": "1536px",
       },
     },
   },

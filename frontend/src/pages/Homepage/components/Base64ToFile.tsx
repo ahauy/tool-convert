@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import httpService from "@/services/httpService";
 import { ApiUrl } from "@/consts/apiUrl";
 import { base64Store } from "@/helpers/base64Store";
@@ -46,6 +47,7 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
 
   const dataRef = useRef("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pasteAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return () => {
@@ -103,6 +105,11 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    loadText(e.clipboardData.getData("text"));
+  };
+
   const handleConvert = async () => {
     const raw = dataRef.current;
     const mime = meta?.mimeType;
@@ -149,118 +156,132 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
   const canShowPreview = preview && preview.mimeType !== "image/heic";
 
   return (
-    <div className="flex gap-6">
-      <div className="flex flex-1 flex-col gap-3">
-        <label className="font-medium">Base64</label>
-
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={handlePasteButton}>
-            Dán từ clipboard
-          </Button>
-          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-            Chọn file .txt
-          </Button>
-          {meta && (
-            <Button type="button" variant="outline" onClick={clearInput}>
-              Xoá
+    <div className="space-y-4 xs:space-y-6">
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Nhập Base64</CardTitle>
+          <CardDescription className="text-xs">
+            Dán chuỗi Base64 (có hoặc không có tiền tố data:image/...;base64,)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-0">
+          <div className="flex flex-col xs:flex-row flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={handlePasteButton} className="w-full xs:w-auto">
+              Dán từ clipboard
             </Button>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt,text/plain"
-            onChange={handleTxtFile}
-            className="hidden"
-          />
-        </div>
-
-        <div
-          tabIndex={0}
-          role="textbox"
-          aria-readonly="true"
-          onPaste={(e) => {
-            e.preventDefault();
-            loadText(e.clipboardData.getData("text"));
-          }}
-          className="min-h-[200px] w-full overflow-auto whitespace-pre-wrap break-all rounded-md border p-3 text-xs outline-none focus:ring-2 focus:ring-ring"
-        >
-          {meta ? (
-            makePreview(meta.head, meta.length)
-          ) : (
-            <span className="text-gray-500">
-              Bấm vào đây rồi nhấn Ctrl+V để dán chuỗi Base64 (data:image/png;base64,...)
-            </span>
-          )}
-        </div>
-
-        {meta && (
-          <p className="text-sm text-gray-500">
-            {meta.mimeType ?? "Không nhận diện được loại file"} · {meta.length.toLocaleString()} ký tự
-            {!meta.hasPrefix && meta.mimeType && " · thiếu tiền tố, sẽ tự thêm"}
-          </p>
-        )}
-
-        <input
-          type="text"
-          value={fileName}
-          onChange={(e) => setFileName(e.target.value)}
-          maxLength={255}
-          placeholder="Tên file (không bắt buộc, ví dụ: anh-cua-toi.png)"
-          className="rounded-md border p-2"
-        />
-
-        <Button
-          type="button"
-          onClick={handleConvert}
-          disabled={!meta || isLoading}
-          isLoading={isLoading}
-        >
-          Convert sang file
-        </Button>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-3">
-        <label className="font-medium">Kết quả</label>
-
-        {!preview ? (
-          <div className="flex min-h-[250px] items-center justify-center rounded-md border text-sm text-gray-500">
-            File sau khi convert sẽ hiển thị ở đây
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 rounded-md border p-3">
-            {canShowPreview && (
-              preview.kind === "image" ? (
-                <img
-                  src={preview.url}
-                  alt={preview.fileName}
-                  decoding="async"
-                  className="max-h-[300px] w-full rounded-md object-contain"
-                />
-              ) : (
-                <video
-                  src={preview.url}
-                  controls
-                  preload="metadata"
-                  className="max-h-[300px] w-full rounded-md"
-                />
-              )
+            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full xs:w-auto">
+              Chọn file .txt
+            </Button>
+            {meta && (
+              <Button type="button" variant="outline" onClick={clearInput} className="w-full xs:w-auto">
+                Xoá
+              </Button>
             )}
-
-            <div className="text-sm text-gray-500">
-              <p><strong>File:</strong> {preview.fileName}</p>
-              <p><strong>Type:</strong> {preview.mimeType}</p>
-              <p><strong>Size:</strong> {formatBytes(preview.blob.size)}</p>
-              {!canShowPreview && (
-                <p className="mt-1">Trình duyệt không xem trước được định dạng này, hãy tải về.</p>
-              )}
-            </div>
-
-            <Button type="button" onClick={() => downloadBlob(preview.blob, preview.fileName)}>
-              Tải xuống
-            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,text/plain"
+              onChange={handleTxtFile}
+              className="hidden"
+            />
           </div>
-        )}
-      </div>
+
+          <div
+            ref={pasteAreaRef}
+            tabIndex={0}
+            role="textbox"
+            aria-readonly="true"
+            onPaste={handlePaste}
+            onClick={() => pasteAreaRef.current?.focus()}
+            className="min-h-[150px] xs:min-h-[200px] w-full overflow-auto whitespace-pre-wrap break-all rounded-lg border bg-muted/50 p-3 text-xs font-mono outline-none focus:ring-2 focus:ring-ring transition-all"
+          >
+            {meta ? (
+              makePreview(meta.head, meta.length)
+            ) : (
+              <span className="text-muted-foreground">
+                Bấm vào đây rồi nhấn Ctrl+V để dán chuỗi Base64 (data:image/png;base64,...)
+              </span>
+            )}
+          </div>
+
+          {meta && (
+            <p className="text-xs text-muted-foreground">
+              {meta.mimeType ?? "Không nhận diện được loại file"} · {meta.length.toLocaleString()} ký tự
+              {!meta.hasPrefix && meta.mimeType && " · thiếu tiền tố, sẽ tự thêm"}
+            </p>
+          )}
+
+          <div className="space-y-3">
+            <label className="block text-sm font-medium">Tên file (không bắt buộc)</label>
+            <input
+              type="text"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              maxLength={255}
+              placeholder="Ví dụ: anh-cua-toi.png"
+              className="w-full rounded-lg border p-3 text-sm"
+            />
+          </div>
+
+          <Button
+            type="button"
+            onClick={handleConvert}
+            disabled={!meta || isLoading}
+            isLoading={isLoading}
+            className="w-full xs:w-auto"
+          >
+            Convert sang file
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Kết quả</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {!preview ? (
+            <div className="flex min-h-[200px] xs:min-h-[250px] items-center justify-center rounded-lg border text-sm text-muted-foreground">
+              File sau khi convert sẽ hiển thị ở đây
+            </div>
+          ) : (
+            <div className="space-y-4 rounded-lg border p-4">
+              {canShowPreview && (
+                <div className="rounded-lg overflow-hidden">
+                  {preview.kind === "image" ? (
+                    <img
+                      src={preview.url}
+                      alt={preview.fileName}
+                      decoding="async"
+                      className="max-h-[300px] w-full object-contain"
+                    />
+                  ) : (
+                    <video
+                      src={preview.url}
+                      controls
+                      preload="metadata"
+                      className="max-h-[300px] w-full rounded-lg"
+                    />
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <p><strong>File:</strong> {preview.fileName}</p>
+                <p><strong>Type:</strong> {preview.mimeType}</p>
+                <p><strong>Size:</strong> {formatBytes(preview.blob.size)}</p>
+                {!canShowPreview && (
+                  <p className="mt-1 text-amber-600 dark:text-amber-400">Trình duyệt không xem trước được định dạng này, hãy tải về.</p>
+                )}
+              </div>
+
+              <Button type="button" onClick={() => downloadBlob(preview.blob, preview.fileName)} className="w-full xs:w-auto">
+                Tải xuống
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

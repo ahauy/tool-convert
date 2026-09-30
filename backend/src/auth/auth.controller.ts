@@ -13,9 +13,7 @@ import { AuthDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-  ) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   async register(@Body() dto: AuthDto) {
@@ -50,13 +48,10 @@ export class AuthController {
     const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
-      throw new UnauthorizedException(
-        'Không tìm thấy refresh token',
-      );
+      throw new UnauthorizedException('Không tìm thấy refresh token');
     }
 
-    const result =
-      await this.authService.funcRefreshToken(refreshToken);
+    const result = await this.authService.funcRefreshToken(refreshToken);
 
     res.cookie('refreshToken', result.refreshToken, {
       httpOnly: true,
@@ -76,9 +71,7 @@ export class AuthController {
     @Req() req: express.Request,
     @Res({ passthrough: true }) res: express.Response,
   ) {
-    await this.authService.logout(
-      req.cookies.refreshToken,
-    );
+    await this.authService.logout(req.cookies.refreshToken);
 
     res.clearCookie('refreshToken');
 
