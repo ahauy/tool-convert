@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import httpService from "@/services/httpService";
 import { ApiUrl } from "@/consts/apiUrl";
@@ -20,11 +19,11 @@ import {
   type MediaKind,
 } from "@/helpers/file";
 
-// Chỉ giữ thông tin nhỏ trong state. Chuỗi Base64 đầy đủ nằm trong ref.
 interface InputMeta {
   length: number;
-  mimeType: string | null; // null = không nhận diện được
+  mimeType: string | null;
   hasPrefix: boolean;
+  head: string;
 }
 
 interface Preview {
@@ -36,25 +35,18 @@ interface Preview {
 }
 
 interface Props {
-  /** Tăng lên mỗi khi tab bên kia muốn chuyển chuỗi sang đây */
   incomingVersion?: number;
 }
 
-// Trình duyệt không hiển thị được HEIC, nên chỉ xem trước các loại còn lại
-const canPreview = (mimeType: string) => mimeType !== "image/heic";
-
 const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
   const [meta, setMeta] = useState<InputMeta | null>(null);
-  const [head, setHead] = useState(""); // chỉ PREVIEW_LENGTH ký tự đầu để hiển thị
   const [fileName, setFileName] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Chuỗi đầy đủ: giữ ngoài state/DOM
   const dataRef = useRef("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Giải phóng blob URL khi đổi kết quả hoặc rời trang
   useEffect(() => {
     return () => {
       if (preview) URL.revokeObjectURL(preview.url);
@@ -64,12 +56,10 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
   const clearInput = () => {
     dataRef.current = "";
     setMeta(null);
-    setHead("");
     setPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  /** Nhận chuỗi từ mọi nguồn (dán, file .txt, tab bên kia) mà không đưa vào DOM */
   const loadText = (text: string) => {
     const raw = text.trim();
     setPreview(null);
@@ -80,29 +70,20 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
     }
 
     dataRef.current = raw;
-
     const prefixedMime = readDataUrlMime(raw);
     setMeta({
       length: raw.length,
       mimeType: prefixedMime ?? guessMimeFromBase64(raw),
       hasPrefix: !!prefixedMime,
+      head: raw.slice(0, PREVIEW_LENGTH),
     });
-    setHead(raw.slice(0, PREVIEW_LENGTH));
   };
 
-  // Nhận chuỗi từ tab "Ảnh / Video → Base64"
   useEffect(() => {
     if (incomingVersion > 0) {
       loadText(base64Store.take());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingVersion]);
-
-  // Bắt sự kiện dán và CHẶN việc chuỗi lớn đi vào DOM (nguyên nhân chính gây lag)
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    loadText(e.clipboardData.getData("text"));
-  };
 
   const handlePasteButton = async () => {
     try {
@@ -124,50 +105,38 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
 
   const handleConvert = async () => {
     const raw = dataRef.current;
-    const mimeType = meta?.mimeType;
+    const mime = meta?.mimeType;
 
-    if (!raw || !mimeType) {
-      showError(
-        "Không nhận diện được loại file. Hãy dùng dạng data:image/png;base64,... hoặc data:video/mp4;base64,..."
-      );
+    if (!raw || !mime) {
+      showError("Không nhận diện được loại file. Hãy dùng dạng data:image/png;base64,...");
       return;
     }
 
-    const kind = getMediaKind(mimeType);
+    const kind = getMediaKind(mime);
     if (!kind) {
-      showError(`Loại file "${mimeType}" chưa được hỗ trợ`);
+      showError(`Loại file "${mime}" chưa được hỗ trợ`);
       return;
     }
 
     try {
       setIsLoading(true);
+      const dataUrl = meta.hasPrefix ? raw : buildDataUrl(mime, raw);
+      const url = kind === "image" ? ApiUrl.BASE64_TO_IMAGE : ApiUrl.BASE64_TO_VIDEO;
 
-      // Backend BẮT BUỘC data URL; nếu người dùng đưa Base64 trần thì tự thêm tiền tố
-      const dataUrl = meta?.hasPrefix ? raw : buildDataUrl(mimeType, raw);
-      const url =
-        kind === "image" ? ApiUrl.BASE64_TO_IMAGE : ApiUrl.BASE64_TO_VIDEO;
-
-      // Chỉ gửi đúng 2 field này: backend bật forbidNonWhitelisted
-      const response = await httpService.axios.post<Blob>(
+      const res = await httpService.axios.post<Blob>(
         url,
         { base64: dataUrl, fileName: fileName.trim() || undefined },
         { responseType: "blob" }
       );
 
-      const blob = response.data;
-      const resultMime = blob.type || mimeType;
+      const blob = res.data;
+      const resultMime = blob.type || mime;
       const name =
         fileName.trim() ||
-        getFileNameFromDisposition(response.headers["content-disposition"]) ||
+        getFileNameFromDisposition(res.headers["content-disposition"]) ||
         `file_${Date.now()}.${extFromMime(resultMime)}`;
 
-      setPreview({
-        url: URL.createObjectURL(blob),
-        kind,
-        mimeType: resultMime,
-        fileName: name,
-        blob,
-      });
+      setPreview({ url: URL.createObjectURL(blob), kind, mimeType: resultMime, fileName: name, blob });
       showSuccess("Convert thành công");
     } catch (error) {
       setPreview(null);
@@ -177,11 +146,10 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
     }
   };
 
-  const previewText = meta ? makePreview(head, meta.length) : "";
+  const canShowPreview = preview && preview.mimeType !== "image/heic";
 
   return (
     <div className="flex gap-6">
-      {/* Nhập Base64 */}
       <div className="flex flex-1 flex-col gap-3">
         <label className="font-medium">Base64</label>
 
@@ -189,11 +157,7 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
           <Button type="button" variant="outline" onClick={handlePasteButton}>
             Dán từ clipboard
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-          >
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
             Chọn file .txt
           </Button>
           {meta && (
@@ -210,15 +174,19 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
           />
         </div>
 
-        {/* Khung nhận Ctrl+V: chỉ hiển thị phần đầu, chuỗi đầy đủ nằm trong ref */}
         <div
           tabIndex={0}
           role="textbox"
           aria-readonly="true"
-          onPaste={handlePaste}
+          onPaste={(e) => {
+            e.preventDefault();
+            loadText(e.clipboardData.getData("text"));
+          }}
           className="min-h-[200px] w-full overflow-auto whitespace-pre-wrap break-all rounded-md border p-3 text-xs outline-none focus:ring-2 focus:ring-ring"
         >
-          {previewText || (
+          {meta ? (
+            makePreview(meta.head, meta.length)
+          ) : (
             <span className="text-gray-500">
               Bấm vào đây rồi nhấn Ctrl+V để dán chuỗi Base64 (data:image/png;base64,...)
             </span>
@@ -227,8 +195,7 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
 
         {meta && (
           <p className="text-sm text-gray-500">
-            {meta.mimeType ?? "Không nhận diện được loại file"} ·{" "}
-            {meta.length.toLocaleString()} ký tự
+            {meta.mimeType ?? "Không nhận diện được loại file"} · {meta.length.toLocaleString()} ký tự
             {!meta.hasPrefix && meta.mimeType && " · thiếu tiền tố, sẽ tự thêm"}
           </p>
         )}
@@ -252,7 +219,6 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
         </Button>
       </div>
 
-      {/* Kết quả */}
       <div className="flex flex-1 flex-col gap-3">
         <label className="font-medium">Kết quả</label>
 
@@ -262,8 +228,8 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
           </div>
         ) : (
           <div className="flex flex-col gap-3 rounded-md border p-3">
-            {canPreview(preview.mimeType) &&
-              (preview.kind === "image" ? (
+            {canShowPreview && (
+              preview.kind === "image" ? (
                 <img
                   src={preview.url}
                   alt={preview.fileName}
@@ -277,29 +243,19 @@ const Base64ToFile = ({ incomingVersion = 0 }: Props) => {
                   preload="metadata"
                   className="max-h-[300px] w-full rounded-md"
                 />
-              ))}
+              )
+            )}
 
             <div className="text-sm text-gray-500">
-              <p>
-                <strong>File:</strong> {preview.fileName}
-              </p>
-              <p>
-                <strong>Type:</strong> {preview.mimeType}
-              </p>
-              <p>
-                <strong>Size:</strong> {formatBytes(preview.blob.size)}
-              </p>
-              {!canPreview(preview.mimeType) && (
-                <p className="mt-1">
-                  Trình duyệt không xem trước được định dạng này, hãy tải về.
-                </p>
+              <p><strong>File:</strong> {preview.fileName}</p>
+              <p><strong>Type:</strong> {preview.mimeType}</p>
+              <p><strong>Size:</strong> {formatBytes(preview.blob.size)}</p>
+              {!canShowPreview && (
+                <p className="mt-1">Trình duyệt không xem trước được định dạng này, hãy tải về.</p>
               )}
             </div>
 
-            <Button
-              type="button"
-              onClick={() => downloadBlob(preview.blob, preview.fileName)}
-            >
+            <Button type="button" onClick={() => downloadBlob(preview.blob, preview.fileName)}>
               Tải xuống
             </Button>
           </div>
